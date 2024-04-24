@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const input = require('./input');
+const config = require('./config');
 const chalk = require('chalk');  // Import chalk
-const resultPath = 'result';
+const resultPath = 'results';
 
 // List of names
 var values = input.values;
@@ -28,10 +29,61 @@ function clearDirectory(directory) {
     }
 }
 
+function reload(values, names) {
+    return new Promise((resolve, reject) => {
+        fs.readdir(resultPath, (err, files) => {
+            if (err) {
+                console.log(chalk.red('ERROR: ') + chalk.white('Failed to read the result directory.'));
+                reject(err);
+                return;
+            }
+
+            let filesProcessed = 0;
+
+            if (files.length === 0) {
+                resolve();
+            }
+
+            files.forEach(file => {
+                const name = path.basename(file, '.txt'); // Remove the '.txt' extension to get the name
+
+                fs.readFile(path.join(resultPath, file), 'utf8', (err, value) => {
+                    if (err) {
+                        console.log(chalk.red('ERROR: ') + chalk.white(`Failed to read value from ${file}.`));
+                        reject(err);
+                        return;
+                    }
+
+                    const nameIndex = names.indexOf(name);
+                    if (nameIndex !== -1) {
+                        names.splice(nameIndex, 1);
+                    }
+
+                    const valueIndex = values.indexOf(value.trim());
+                    if (valueIndex !== -1) {
+                        values.splice(valueIndex, 1);
+                    }
+
+                    filesProcessed++;
+                    if (filesProcessed === files.length) {
+                        console.log(chalk.blue('LOADING') + " complete; " + chalk.blueBright(`${names.length} name(s)`) + " remaining");
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+}
+
 // Function to create a file for each name with the assigned random value
-function assignValuesAndCreateFiles(names) {
+async function assignValuesAndCreateFiles(names) {
     // Clear the result directory first
-    clearDirectory(resultPath);
+
+    if(config.reset){
+        clearDirectory(resultPath);
+    }else{
+        await reload(values,names)
+    }
 
     for (let i = 0; i < names.length; i++) {
         const name = names[i];
